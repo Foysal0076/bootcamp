@@ -6,22 +6,29 @@ import ErrorResponse from "../utils/ErrorResponse.js"
 //@desc     Fetch all bootcamps
 //@access   Public
 const getAllBotocamps = asyncHandler(async (req, res, next) => {
-    const bootcampPerPage = Number(req.query.perpage) || 2
+    const bootcampPerPage = Number(req.query.perPage) || 8
     const currentPage = Number(req.query.page) || 1
 
-    const keyword = req.query.keyword
-        ? {
-            name: {
-                $regex: req.query.keyword,
-                $options: 'i',
-            },
-        }
-        : {}
+    let query
+    const reqQuery = { ...req.query }
+    const removeFields = ['sort', 'page', 'perPage', 'keyword']
 
-    const count = await Bootcamp.countDocuments({ ...keyword })
+    removeFields.forEach(params => delete reqQuery[params])
 
-    const bootcamps = await Bootcamp.find({ ...keyword })
-        .sort({ createdAt: -1 })
+    let queryString = JSON.stringify(reqQuery)
+
+    queryString = queryString.replace(/\b(gt|gte|lt|lte|in)\b/g, (match) => `$${match}`)
+
+    query = JSON.parse(queryString)
+
+    if (req.query.keyword) {
+        query.name = { $regex: req.query.keyword, $options: 'i' }
+    }
+
+    const count = await Bootcamp.countDocuments(query)
+
+    const bootcamps = await Bootcamp.find(query)
+        .sort(req.query.sort || { price: 'asc' })
         .limit(bootcampPerPage)
         .skip(bootcampPerPage * (currentPage - 1))
 
